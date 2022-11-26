@@ -6,15 +6,18 @@ from sys import platform
 from multipass import MultipassClient
 
 
-def execute(vm_name, script):
+def execute(vm_name, script, verbose):
     client = MultipassClient()
+    if verbose: print("transfer", script, "to", vm_name)
     client.transfer(script, "%s:/home/ubuntu" % vm_name)
     vm = client.get_vm(vm_name)
     if platform == 'win32':
         script_filename = script.split('\\')[-1]
     else:
         script_filename = script.split('/')[-1]
+    if verbose: print(vm_name, "chmod +x %s" % script_filename)
     vm.exec("chmod +x %s" % script_filename)
+    if verbose: print(vm_name, "./%s" % script_filename)
     vm.exec("./%s" % script_filename)
 
 
@@ -50,7 +53,7 @@ class MultipassOrchestrator:
                                    mem=self.config[vm_name]['mem'],
                                    image=self.config[vm_name]['image'])
 
-    def build_environment(self):
+    def build_environment(self, verbose):
         if platform == "linux" or platform == "linux2":
             # Multipass installed with Snap can not access /tmp
             tmp_dir = os.path.join(os.path.expanduser("~"), 'mpo-tmp')
@@ -77,14 +80,14 @@ class MultipassOrchestrator:
                 if 'build_scripts' in build[vm_name]:
                     for i in range(len(build[vm_name]['build_scripts'])):
                         fh.write("%s 2>> .build_err.log >> .build_out.log\n" % build[vm_name]['build_scripts'][i])
-                proc = multiprocessing.Process(target=execute, args=(vm_name, build_script,))
+                proc = multiprocessing.Process(target=execute, args=(vm_name, build_script, verbose,))
                 self.procs.append(proc)
                 proc.start()
 
         for proc in self.procs:
             proc.join()
 
-    def run_environment(self):
+    def run_environment(self, verbose):
         if platform == "linux" or platform == "linux2":
             # Multipass installed with Snap can not access /tmp
             tmp_dir = os.path.join(os.path.expanduser("~"), 'mpo-tmp')
@@ -106,7 +109,7 @@ class MultipassOrchestrator:
                 if 'run_scripts' in run[vm_name]:
                     for i in range(len(run[vm_name]['run_scripts'])):
                         fh.write("%s 2>> .run_err.log >> .run_out.log\n" % run[vm_name]['run_scripts'][i])
-                proc = multiprocessing.Process(target=execute, args=(vm_name, run_script,))
+                proc = multiprocessing.Process(target=execute, args=(vm_name, run_script, verbose,))
                 self.procs.append(proc)
                 proc.start()
 
